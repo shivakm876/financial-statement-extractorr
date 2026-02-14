@@ -21,7 +21,7 @@ The focus of this implementation is reliability, structured output, and preventi
 ## 🌐 Live Deployment
 
 Public URL:  
-[Insert your Render deployment link here]
+https://financial-statement-extractorr.onrender.com
 
 ---
 
@@ -215,12 +215,7 @@ Potential enhancements:
 - Support for scanned PDFs via OCR-enabled deployment
 
 ---
-## 🌐 Live Deployment
 
-Hosted on Render.
-
-Live URL:
-https://financial-statement-extractorr.onrender.com
 
 ## 👤 Author
 
