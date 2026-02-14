@@ -835,4 +835,4 @@ async def preview(files: List[UploadFile] = File(...)):
 
 @app.get("/")
 async def serve_index():
-    return FileResponse("index.html") see theexcel cv files im getting
+    return FileResponse("index.html") 
