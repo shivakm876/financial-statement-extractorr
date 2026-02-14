@@ -215,6 +215,12 @@ Potential enhancements:
 - Support for scanned PDFs via OCR-enabled deployment
 
 ---
+## 🌐 Live Deployment
+
+Hosted on Render.
+
+Live URL:
+https://financial-statement-extractorr.onrender.com
 
 ## 👤 Author
 
