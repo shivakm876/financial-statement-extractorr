@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>FinSight — Financial Statement Extractor</title>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #0C0F1A; --surface: #131725; --border:  #1F2840;
+      --border2: #2A3555; --text:    #E8EBF5; --muted:   #6B7599;
+      --accent:  #4F7EFF; --green:   #00D4AA; --gold:    #F5C842;
+      --red:     #FF6B6B;
+    }
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; overflow-x: hidden;
+    }
+    body::before {
+      content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 0;
+      background-image: linear-gradient(var(--border) 1px, transparent 1px),
+                        linear-gradient(90deg, var(--border) 1px, transparent 1px);
+      background-size: 48px 48px; opacity: 0.35;
+    }
+    .wrap { max-width: 860px; margin: 0 auto; padding: 0 24px; position: relative; z-index: 1; }
+
+    /* ── Header ── */
+    header { padding: 52px 0 32px; animation: fadeDown .5s ease both; }
+    .logo-row { display: flex; align-items: center; gap: 12px; margin-bottom: 10px; }
+    .logo { width: 42px; height: 42px; border-radius: 12px; display: flex; align-items: center; justify-content: center; font-size: 22px;
+      background: linear-gradient(135deg, var(--accent), var(--green)); }
+    h1 { font-family: 'DM Serif Display', serif; font-size: 2rem; letter-spacing: -.5px;
+      background: linear-gradient(90deg, var(--text), var(--green)); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+    .sub { color: var(--muted); font-size: .9rem; line-height: 1.6; max-width: 500px; margin-left: 54px; }
+
+    /* ── Badges ── */
+    .badges { display: flex; gap: 8px; flex-wrap: wrap; margin: 24px 0; animation: fadeDown .5s .08s ease both; }
+    .badge { display: flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 100px;
+      border: 1px solid var(--border2); background: var(--surface); color: var(--muted);
+      font-size: .75rem; font-family: 'DM Mono', monospace; }
+    .dot { width: 7px; height: 7px; border-radius: 50%; }
+
+    /* ── Card ── */
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px;
+      overflow: hidden; animation: fadeUp .5s .12s ease both; }
+
+    /* ── Drop Zone ── */
+    .drop-zone { padding: 44px 36px; text-align: center; cursor: pointer;
+      border-bottom: 1px solid var(--border); transition: background .2s; position: relative; }
+    .drop-zone.drag-over { background: rgba(79,126,255,.06); border-color: var(--accent); }
+    .drop-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+    .upload-icon { width: 60px; height: 60px; margin: 0 auto 16px; border-radius: 16px;
+      background: rgba(79,126,255,.1); border: 1.5px dashed rgba(79,126,255,.4);
+      display: flex; align-items: center; justify-content: center; font-size: 26px;
+      transition: transform .2s, background .2s; }
+    .drop-zone:hover .upload-icon, .drop-zone.drag-over .upload-icon {
+      transform: scale(1.08) translateY(-2px); background: rgba(79,126,255,.18); }
+    .drop-label { font-size: .95rem; font-weight: 600; margin-bottom: 5px; }
+    .drop-sub { font-size: .82rem; color: var(--muted); }
+
+    /* ── File list ── */
+    .file-list { display: none; padding: 16px 28px; border-bottom: 1px solid var(--border);
+      background: rgba(79,126,255,.04); gap: 8px; flex-direction: column; }
+    .file-list.visible { display: flex; }
+    .file-row { display: flex; align-items: center; gap: 10px; }
+    .file-row-name { flex: 1; font-size: .88rem; font-weight: 500; }
+    .file-row-size { font-size: .75rem; color: var(--muted); font-family: 'DM Mono', monospace; }
+    .rm { background: none; border: 1px solid var(--border2); border-radius: 6px;
+      color: var(--muted); padding: 3px 8px; cursor: pointer; font-size: .75rem; transition: all .15s; }
+    .rm:hover { border-color: var(--red); color: var(--red); }
+    .add-more { display: flex; align-items: center; gap: 6px; color: var(--accent);
+      font-size: .8rem; cursor: pointer; border: none; background: none;
+      font-family: 'Inter', sans-serif; padding: 4px 0; }
+    .add-more:hover { text-decoration: underline; }
+
+    /* ── Footer / buttons ── */
+    .card-footer { padding: 20px 28px; display: flex; gap: 12px; }
+    .btn-main { flex: 1; padding: 13px; background: linear-gradient(135deg, var(--accent), #3B5FD9);
+      border: none; border-radius: 12px; color: white; font-size: .92rem; font-weight: 600;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+      transition: all .2s; }
+    .btn-main:hover:not(:disabled) { transform: translateY(-1px); box-shadow: 0 8px 24px rgba(79,126,255,.35); }
+    .btn-main:disabled { opacity: .45; cursor: not-allowed; }
+    .btn-sec { padding: 13px 18px; background: transparent; border: 1px solid var(--border2);
+      border-radius: 12px; color: var(--muted); font-size: .88rem; cursor: pointer; transition: all .2s; }
+    .btn-sec:hover:not(:disabled) { border-color: var(--green); color: var(--green); }
+    .btn-sec:disabled { opacity: .4; cursor: not-allowed; }
+
+    /* ── Progress ── */
+    .progress { display: none; padding: 24px 28px; border-top: 1px solid var(--border); }
+    .progress.visible { display: block; }
+    .steps { display: flex; flex-direction: column; gap: 10px; }
+    .step { display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+      border-radius: 10px; border: 1px solid transparent; transition: all .3s; }
+    .step.active { background: rgba(79,126,255,.08); border-color: rgba(79,126,255,.3); }
+    .step.done   { background: rgba(0,212,170,.06);  border-color: rgba(0,212,170,.2); }
+    .step.error  { background: rgba(255,107,107,.08); border-color: rgba(255,107,107,.3); }
+    .s-icon { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; font-size: 13px; flex-shrink: 0; background: var(--border); }
+    .step.active .s-icon { background: rgba(79,126,255,.2); }
+    .step.done   .s-icon { background: rgba(0,212,170,.2); }
+    .s-label { font-size: .88rem; font-weight: 500; }
+    .s-sub   { font-size: .75rem; color: var(--muted); margin-top: 2px; }
+    .spinner { width: 14px; height: 14px; border: 2px solid rgba(79,126,255,.3);
+      border-top-color: var(--accent); border-radius: 50%; animation: spin .7s linear infinite; }
+
+    /* ── Result ── */
+    .result { display: none; padding: 24px 28px; border-top: 1px solid var(--border); }
+    .result.visible { display: block; }
+    .r-head { display: flex; align-items: center; gap: 12px; margin-bottom: 18px; }
+    .r-check { width: 38px; height: 38px; background: rgba(0,212,170,.15); border: 1.5px solid var(--green);
+      border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 17px; }
+    .r-title { font-family: 'DM Serif Display', serif; font-size: 1.2rem; }
+    .r-sub   { color: var(--muted); font-size: .82rem; margin-top: 2px; }
+    .meta-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+      gap: 10px; margin-bottom: 16px; }
+    .meta-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; }
+    .meta-lbl { font-size: .68rem; color: var(--muted); text-transform: uppercase;
+      letter-spacing: .8px; margin-bottom: 3px; font-family: 'DM Mono', monospace; }
+    .meta-val { font-size: .92rem; font-weight: 600; }
+    .conf-row { display: flex; gap: 14px; flex-wrap: wrap; margin-bottom: 20px; }
+    .chip { display: flex; align-items: center; gap: 6px; font-size: .78rem;
+      font-family: 'DM Mono', monospace; }
+    .chip-dot { width: 9px; height: 9px; border-radius: 50%; }
+    .btn-dl { width: 100%; padding: 14px; background: linear-gradient(135deg, var(--green), #00A884);
+      border: none; border-radius: 12px; color: #0C0F1A; font-size: .95rem; font-weight: 700;
+      cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px;
+      transition: all .2s; }
+    .btn-dl:hover { transform: translateY(-1px); box-shadow: 0 10px 28px rgba(0,212,170,.3); }
+    .btn-again { width: 100%; margin-top: 10px; padding: 11px; background: transparent;
+      border: 1px solid var(--border2); border-radius: 12px; color: var(--muted);
+      font-size: .88rem; cursor: pointer; transition: all .2s; }
+    .btn-again:hover { border-color: var(--accent); color: var(--accent); }
+
+    /* ── Error ── */
+    .error-panel { display: none; padding: 18px 28px; border-top: 1px solid var(--border);
+      background: rgba(255,107,107,.05); }
+    .error-panel.visible { display: block; }
+    .err-msg { display: flex; align-items: flex-start; gap: 10px; color: var(--red);
+      font-size: .88rem; line-height: 1.5; }
+
+    footer { margin-top: 48px; padding: 20px 0 36px; border-top: 1px solid var(--border);
+      text-align: center; color: var(--muted); font-size: .75rem; font-family: 'DM Mono', monospace;
+      animation: fadeUp .5s .4s ease both; }
+
+    @keyframes fadeDown { from { opacity:0; transform:translateY(-12px); } to { opacity:1; transform:translateY(0); } }
+    @keyframes fadeUp   { from { opacity:0; transform:translateY(12px);  } to { opacity:1; transform:translateY(0); } }
+    @keyframes spin     { to { transform:rotate(360deg); } }
+
+    @media(max-width:640px) {
+      h1 { font-size: 1.6rem; } .sub { margin-left: 0; margin-top: 8px; }
+    }
+  </style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="logo-row">
+      <div class="logo">📊</div>
+      <h1>FinSight</h1>
+    </div>
+    <p class="sub">Upload financial statement PDFs — income statements, annual reports, quarterly filings — and get a structured, analyst-ready Excel in seconds.</p>
+  </header>
+
+  <div class="badges">
+    <div class="badge"><span class="dot" style="background:var(--green)"></span>GPT-4o-mini Mapping</div>
+    <div class="badge"><span class="dot" style="background:var(--accent)"></span>pdfplumber Extraction</div>
+    <div class="badge"><span class="dot" style="background:var(--gold)"></span>Multi-Year Columns</div>
+    <div class="badge"><span class="dot" style="background:var(--green)"></span>INR / USD Detection</div>
+    <div class="badge"><span class="dot" style="background:#C084FC"></span>Confidence Scoring</div>
+    <div class="badge"><span class="dot" style="background:var(--red)"></span>Multiple PDFs</div>
+  </div>
+
+  <div class="card" id="card">
+
+    <!-- Drop zone -->
+    <div class="drop-zone" id="dz">
+      <input type="file" id="fi" accept=".pdf" multiple>
+      <div class="upload-icon">📁</div>
+      <div class="drop-label">Drop one or more PDFs here, or click to browse</div>
+      <div class="drop-sub">Annual reports · Financial statements · Quarterly filings · Max 50MB each</div>
+    </div>
+
+    <!-- File list -->
+    <div class="file-list" id="fl"></div>
+
+    <!-- Buttons -->
+    <div class="card-footer">
+      <button class="btn-main" id="eb" disabled onclick="runExtract()">
+        <span id="bi">⚡</span><span id="bl">Extract to Excel</span>
+      </button>
+      <button class="btn-sec" id="pb" disabled onclick="runPreview()">Preview</button>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress" id="prog">
+      <div class="steps">
+        <div class="step" id="s1"><div class="s-icon" id="si1">📤</div><div><div class="s-label">Uploading documents</div><div class="s-sub">Sending PDFs to server</div></div></div>
+        <div class="step" id="s2"><div class="s-icon" id="si2">🔍</div><div><div class="s-label">Extracting tables</div><div class="s-sub">pdfplumber scanning all pages</div></div></div>
+        <div class="step" id="s3"><div class="s-icon" id="si3">🤖</div><div><div class="s-label">AI field mapping</div><div class="s-sub">GPT-4o-mini normalising line items to standard schema</div></div></div>
+        <div class="step" id="s4"><div class="s-icon" id="si4">📊</div><div><div class="s-label">Building Excel</div><div class="s-sub">Generating colour-coded output with confidence scores</div></div></div>
+      </div>
+    </div>
+
+    <!-- Result -->
+    <div class="result" id="res">
+      <div class="r-head">
+        <div class="r-check">✅</div>
+        <div><div class="r-title" id="rt">Extraction Complete</div><div class="r-sub" id="rs">—</div></div>
+      </div>
+      <div class="meta-grid" id="mg"></div>
+      <div class="conf-row" id="cr"></div>
+      <button class="btn-dl" id="dlb">⬇ Download Excel File</button>
+      <button class="btn-again" onclick="reset()">↩ Process another document</button>
+    </div>
+
+    <!-- Error -->
+    <div class="error-panel" id="ep">
+      <div class="err-msg"><span>⚠️</span><span id="et">Something went wrong.</span></div>
+    </div>
+
+  </div><!-- /.card -->
+
+  <footer>FinSight · Financial Statement Extractor · Research Portal v3.0</footer>
+
+</div>
+
+<script>
+const API = 'http://127.0.0.1:8000';
+
+let files = [];
+let blob  = null;
+let fname = 'financial_statement.xlsx';
+
+// ── File handling ──────────────────────────────────────────────────────────
+
+const dz = document.getElementById('dz');
+const fi = document.getElementById('fi');
+
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  const pdfs = Array.from(e.dataTransfer.files).filter(f => f.name.endsWith('.pdf'));
+  if (pdfs.length) addFiles(pdfs); else showErr('Please drop PDF files only.');
+});
+fi.addEventListener('change', e => { if (e.target.files.length) addFiles(Array.from(e.target.files)); });
+
+function addFiles(newFiles) {
+  files = [...files, ...newFiles];
+  renderFileList();
+  hide(['res','prog','ep']);
+  blob = null;
+}
+
+function removeFile(i) {
+  files.splice(i, 1);
+  renderFileList();
+}
+
+function renderFileList() {
+  const fl = document.getElementById('fl');
+  if (!files.length) { fl.classList.remove('visible'); setButtons(false); return; }
+  fl.classList.add('visible');
+  fl.innerHTML = files.map((f, i) => `
+    <div class="file-row">
+      <span>📄</span>
+      <span class="file-row-name">${f.name}</span>
+      <span class="file-row-size">${fmtB(f.size)}</span>
+      <button class="rm" onclick="removeFile(${i})">✕</button>
+    </div>
+  `).join('') + `
+    <button class="add-more" onclick="document.getElementById('fi').click()">+ Add more PDFs</button>
+  `;
+  setButtons(true);
+}
+
+function fmtB(b) {
+  if (b < 1024) return b + ' B';
+  if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+  return (b/1048576).toFixed(2) + ' MB';
+}
+
+// ── Buttons ────────────────────────────────────────────────────────────────
+
+function setButtons(on) {
+  document.getElementById('eb').disabled = !on;
+  document.getElementById('pb').disabled = !on;
+}
+
+function lockUI(on) {
+  document.getElementById('eb').disabled = on;
+  document.getElementById('pb').disabled = on;
+  document.getElementById('bi').textContent = on ? '' : '⚡';
+  document.getElementById('bl').textContent = on ? 'Processing…' : 'Extract to Excel';
+}
+
+// ── Steps ──────────────────────────────────────────────────────────────────
+
+function setStep(n, state) {
+  const el = document.getElementById(`s${n}`);
+  const ic = document.getElementById(`si${n}`);
+  el.className = 'step ' + state;
+  if (state === 'active') ic.innerHTML = '<div class="spinner"></div>';
+  else if (state === 'done')  ic.textContent = '✅';
+  else if (state === 'error') ic.textContent = '❌';
+}
+
+function resetSteps() {
+  const icons = ['📤','🔍','🤖','📊'];
+  [1,2,3,4].forEach(n => {
+    document.getElementById(`s${n}`).className = 'step';
+    document.getElementById(`si${n}`).textContent = icons[n-1];
+  });
+}
+
+// ── Extract ────────────────────────────────────────────────────────────────
+
+async function runExtract() {
+  if (!files.length) return;
+  lockUI(true); blob = null;
+  hide(['res','ep']); show('prog'); resetSteps();
+
+  try {
+    setStep(1,'active');
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    setStep(1,'done'); setStep(2,'active');
+
+    setTimeout(() => { if (isActive(2)) setStep(2,'done'); }, 1200);
+    setTimeout(() => { if (isActive(2)) setStep(2,'done'); setStep(3,'active'); }, 2000);
+    setTimeout(() => { if (isActive(3)) { setStep(3,'done'); setStep(4,'active'); } }, 3500);
+
+    const res = await fetch(`${API}/extract`, { method:'POST', body:fd });
+    if (!res.ok) {
+      const e = await res.json().catch(() => ({detail:'Server error'}));
+      throw new Error(e.detail || `HTTP ${res.status}`);
+    }
+
+    const cd = res.headers.get('Content-Disposition') || '';
+    const m = cd.match(/filename="?([^"]+)"?/);
+    if (m) fname = m[1];
+
+    blob = await res.blob();
+    setStep(2,'done'); setStep(3,'done'); setStep(4,'done');
+
+    showResult({ company: files[0].name.replace('.pdf',''), files: files.length });
+
+  } catch(err) {
+    [1,2,3,4].forEach(n => { if(isActive(n)) setStep(n,'error'); });
+    showErr(err.message);
+  } finally { lockUI(false); }
+}
+
+// ── Preview ────────────────────────────────────────────────────────────────
+
+async function runPreview() {
+  if (!files.length) return;
+  lockUI(true);
+  hide(['res','ep']); show('prog'); resetSteps();
+
+  try {
+    setStep(1,'active');
+    const fd = new FormData();
+    files.forEach(f => fd.append('files', f));
+    setStep(1,'done'); setStep(2,'active');
+    setTimeout(() => { setStep(2,'done'); setStep(3,'active'); }, 1000);
+
+    const res = await fetch(`${API}/preview`, { method:'POST', body:fd });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+    const d = await res.json();
+    setStep(3,'done'); setStep(4,'done');
+    showResult(d);
+
+  } catch(err) {
+    showErr(err.message);
+  } finally { lockUI(false); }
+}
+
+// ── Show result ────────────────────────────────────────────────────────────
+
+function showResult(d) {
+  hide(['prog']); show('res');
+  document.getElementById('rt').textContent =
+    (d.company || files[0]?.name || 'Document') + ' — Extracted';
+  document.getElementById('rs').textContent =
+    `${Array.isArray(d.years_detected) ? d.years_detected.join(', ') : (d.years_detected||'—')}  ·  ${d.currency||'INR'} ${d.unit||'Crores'}`;
+
+  // Meta cards
+  const metas = [
+    {l:'Company',   v: d.company || files[0]?.name || '—'},
+    {l:'Currency',  v: d.currency || 'INR'},
+    {l:'Unit',      v: d.unit || 'Crores'},
+    {l:'Years',     v: Array.isArray(d.years_detected) ? d.years_detected.join(', ') : (d.years_detected||'—')},
+    {l:'PDFs Processed', v: d.files || files.length},
+    {l:'Rows Found', v: d.raw_rows_found || '—'},
+  ];
+  document.getElementById('mg').innerHTML = metas.map(m =>
+    `<div class="meta-card"><div class="meta-lbl">${m.l}</div><div class="meta-val">${m.v}</div></div>`
+  ).join('');
+
+  // Confidence chips
+  if (d.confidence_summary) {
+    const {high=0, medium=0, low=0} = d.confidence_summary;
+    document.getElementById('cr').innerHTML = `
+      <div class="chip"><div class="chip-dot" style="background:#00D4AA"></div>${high} High</div>
+      <div class="chip"><div class="chip-dot" style="background:#F5C842"></div>${medium} Medium</div>
+      <div class="chip"><div class="chip-dot" style="background:#FF6B6B"></div>${low} Low / Not found</div>`;
+  }
+
+  // Download button
+  const dlb = document.getElementById('dlb');
+  if (blob) {
+    dlb.style.display = 'flex';
+    dlb.onclick = () => {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url; a.download = fname;
+      a.click(); URL.revokeObjectURL(url);
+    };
+  } else {
+    dlb.style.display = 'none';
+  }
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+
+function show(id) { document.getElementById(id).classList.add('visible'); }
+function hide(ids) { ids.forEach(id => document.getElementById(id).classList.remove('visible')); }
+function isActive(n) { return document.getElementById(`s${n}`).classList.contains('active'); }
+function showErr(msg) { hide(['prog']); show('ep'); document.getElementById('et').textContent = msg; }
+
+function reset() {
+  files = []; blob = null;
+  document.getElementById('fi').value = '';
+  document.getElementById('fl').classList.remove('visible');
+  document.getElementById('fl').innerHTML = '';
+  setButtons(false);
+  hide(['res','prog','ep']);
+}
+</script>
+</body>
+</html>
